@@ -3,9 +3,10 @@ name: Build Overlays
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -28,6 +29,12 @@ jobs:
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
           echo "SDK_ANDROID_JAR=$(find $ANDROID_HOME/platforms -name android.jar | head -1)" >> $GITHUB_ENV
           echo "$ANDROID_HOME/build-tools/35.0.0" >> $GITHUB_PATH
+
+      - name: Generate build number
+        run: |
+          BUILD_NUM=$(printf "%010d" ${{ github.run_number }})
+          echo "BUILD_NUM=$BUILD_NUM" >> $GITHUB_ENV
+          echo "RELEASE_TAG=github-automated-build-$BUILD_NUM" >> $GITHUB_ENV
 
       - name: Build Overlay-Redmi-A5-Core
         run: |
@@ -53,10 +60,18 @@ jobs:
             -o systemui-build/unsigned.apk \
             systemui-build/resources.zip
 
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: overlays
-          path: |
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Automated Build ${{ env.BUILD_NUM }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            **Overlay-Redmi-A5-Core** — `treble-overlay-xiaomi-redmia5`
+            **Overlay-RedmiA5-SystemUI** — `treble-overlay-xiaomi-redmia5-systemui`
+          files: |
             core-build/unsigned.apk
             systemui-build/unsigned.apk
+          generate_release_notes: false
+          make_latest: false
