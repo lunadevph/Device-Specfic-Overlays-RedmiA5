@@ -32,7 +32,14 @@ jobs:
 
       - name: Generate build number
         run: |
-          BUILD_NUM=$(printf "%010d" ${{ github.run_number }})
+          git fetch --tags
+          LAST=$(git tag -l 'github-automated-build-*' | sed 's/github-automated-build-//' | sort -n | tail -1)
+          if [ -z "$LAST" ]; then
+            NEXT=1
+          else
+            NEXT=$((10#$LAST + 1))
+          fi
+          BUILD_NUM=$(printf "%010d" $NEXT)
           echo "BUILD_NUM=$BUILD_NUM" >> $GITHUB_ENV
           echo "RELEASE_TAG=github-automated-build-$BUILD_NUM" >> $GITHUB_ENV
 
@@ -45,7 +52,7 @@ jobs:
           aapt2 link \
             --manifest Overlay-Redmi-A5-Core/AndroidManifest.xml \
             -I $SDK_ANDROID_JAR \
-            -o core-build/unsigned.apk \
+            -o core-build/overlay-serenity.apk \
             core-build/resources.zip
 
       - name: Build Overlay-RedmiA5-SystemUI
@@ -57,7 +64,7 @@ jobs:
           aapt2 link \
             --manifest Overlay-RedmiA5-SystemUI/AndroidManifest.xml \
             -I $SDK_ANDROID_JAR \
-            -o systemui-build/unsigned.apk \
+            -o systemui-build/overlay-serenity-systemui.apk \
             systemui-build/resources.zip
 
       - name: Create Release
@@ -71,7 +78,7 @@ jobs:
             **Overlay-Redmi-A5-Core** — `treble-overlay-xiaomi-redmia5`
             **Overlay-RedmiA5-SystemUI** — `treble-overlay-xiaomi-redmia5-systemui`
           files: |
-            core-build/unsigned.apk
-            systemui-build/unsigned.apk
+            core-build/overlay-serenity.apk
+            systemui-build/overlay-serenity-systemui.apk
           generate_release_notes: false
           make_latest: false
