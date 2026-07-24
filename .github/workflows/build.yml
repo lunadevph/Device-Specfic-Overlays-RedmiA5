@@ -25,8 +25,9 @@ jobs:
 
       - name: Install SDK platforms
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
           echo "SDK_ANDROID_JAR=$(find $ANDROID_HOME/platforms -name android.jar | head -1)" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> $GITHUB_PATH
 
       - name: Build Overlay-Redmi-A5-Core
         run: |
