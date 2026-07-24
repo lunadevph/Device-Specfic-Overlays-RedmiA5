@@ -1,0 +1,61 @@
+name: Build Overlays
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK platforms
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
+          echo "SDK_ANDROID_JAR=$(find $ANDROID_HOME/platforms -name android.jar | head -1)" >> $GITHUB_ENV
+
+      - name: Build Overlay-Redmi-A5-Core
+        run: |
+          mkdir -p core-build
+          aapt2 compile \
+            --dir Overlay-Redmi-A5-Core/res \
+            -o core-build/resources.zip
+          aapt2 link \
+            --manifest Overlay-Redmi-A5-Core/AndroidManifest.xml \
+            -I $SDK_ANDROID_JAR \
+            -o core-build/unsigned.apk \
+            core-build/resources.zip
+
+      - name: Build Overlay-RedmiA5-SystemUI
+        run: |
+          mkdir -p systemui-build
+          aapt2 compile \
+            --dir Overlay-RedmiA5-SystemUI/res \
+            -o systemui-build/resources.zip
+          aapt2 link \
+            --manifest Overlay-RedmiA5-SystemUI/AndroidManifest.xml \
+            -I $SDK_ANDROID_JAR \
+            -o systemui-build/unsigned.apk \
+            systemui-build/resources.zip
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: overlays
+          path: |
+            core-build/unsigned.apk
+            systemui-build/unsigned.apk

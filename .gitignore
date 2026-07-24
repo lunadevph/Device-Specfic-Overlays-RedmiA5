@@ -1,0 +1,33 @@
+# Android / AOSP
+*.apk
+*.ap_
+*.dex
+*.class
+*.jar
+*.aar
+*.iml
+local.properties
+*.log
+
+# IDE
+.idea/
+.gradle/
+build/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build output
+out/
+gen/
+bin/
+obj/
+
+# Misc
+*.keystore
+*.jks
+*.keys
