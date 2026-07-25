@@ -9,13 +9,11 @@ SDK_JAR="${SDK_JAR:-$ANDROID_HOME/platforms/android-35/android.jar}"
 
 ARCH=$(uname -m)
 
-# --- On aarch64, wrap with box64 if available ---
-if [ "$ARCH" != "x86_64" ] && command -v box64 &>/dev/null; then
-  RUN_AAPT2="box64 $AAPT2"
-  RUN_JAVA="box64 java"
+# --- On aarch64, wrap with qemu-x86_64 if available ---
+if [ "$ARCH" != "x86_64" ] && command -v qemu-x86_64 &>/dev/null; then
+  RUN_AAPT2="qemu-x86_64 $AAPT2"
 else
   RUN_AAPT2="$AAPT2"
-  RUN_JAVA="java"
 fi
 
 # --- Try to find android.jar ---
@@ -77,8 +75,8 @@ USE_APKTOOL=0
 if [ ! -f "$AAPT2" ]; then
   echo "[*] aapt2 not found — will use apktool"
   USE_APKTOOL=1
-elif ! "$AAPT2" version &>/dev/null; then
-  echo "[*] aapt2 not executable ($?) — will use apktool"
+elif ! $RUN_AAPT2 version &>/dev/null; then
+  echo "[*] aapt2 not executable — will use apktool"
   USE_APKTOOL=1
 elif [ ! -f "$SDK_JAR" ]; then
   echo "[*] android.jar not found — will use apktool"

@@ -39,11 +39,11 @@ if [ "$ARCH" = "x86_64" ]; then
 else
   echo "[*] Setting up x86_64 emulation for aapt2..."
   case "$DISTRO" in
-    alpine) EXTRA="box64" ;;
-    debian) EXTRA="qemu-user-static" ;;
+    alpine) EXTRA="qemu-x86_64 qemu-openrc" ;;
+    debian) EXTRA="qemu-user-static binfmt-support" ;;
     fedora|rhel) EXTRA="qemu-user-static" ;;
     arch)   EXTRA="qemu-user-static" ;;
-    void)   EXTRA="box64" ;;
+    void)   EXTRA="qemu-x86_64" ;;
     opensuse) EXTRA="qemu-user-static" ;;
     *)      EXTRA="" ;;
   esac
@@ -70,6 +70,17 @@ command -v zip   &>/dev/null || MISSING+=" zip"
 if [ "$DISTRO" = "alpine" ]; then
   command -v gcompat &>/dev/null || MISSING+=" $PKG_GLIBC"
 fi
+# check emulator(s)
+if [ "$ARCH" != "x86_64" ] && [ -n "$EXTRA" ]; then
+  for pkg in $EXTRA; do
+    case "$pkg" in
+      qemu-x86_64) ! command -v qemu-x86_64 &>/dev/null && MISSING+=" qemu-x86_64" ;;
+      qemu-openrc) ! [ -f /etc/init.d/qemu-binfmt ] && MISSING+=" qemu-openrc" ;;
+      qemu-user-static) ! command -v qemu-x86_64 &>/dev/null && MISSING+=" qemu-user-static" ;;
+      binfmt-support) ! command -v binfmt-support &>/dev/null && MISSING+=" binfmt-support" ;;
+    esac
+  done
+fi
 
 if [ -n "$MISSING" ]; then
   echo "[*] Installing missing packages:$MISSING"
@@ -85,13 +96,17 @@ if [ "$DISTRO" = "alpine" ] && [ ! -e /lib64/ld-linux-x86-64.so.2 ]; then
   sudo ln -sf /lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 fi
 
-# --- On non-x86_64: register binfmt for box64 so x86_64 binaries run transparently ---
-if [ "$ARCH" != "x86_64" ] && command -v box64 &>/dev/null; then
-  if [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
-    echo "[*] binfmt_misc not available — box64 will be used explicitly"
-  elif [ ! -f /proc/sys/fs/binfmt_misc/box64 ] && [ ! -f /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
-    echo "[*] Registering box64 binfmt handler..."
-    echo ':x86_64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00:\xff\xff\xff\xff\xff\xfe\xfe\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff:/usr/bin/box64:OC' | sudo tee /proc/sys/fs/binfmt_misc/register > /dev/null 2>&1 || true
+# --- On Alpine: enable binfmt for qemu-x86_64 ---
+if [ "$ARCH" != "x86_64" ] && [ "$DISTRO" = "alpine" ] && command -v qemu-x86_64 &>/dev/null; then
+  if [ -f /proc/sys/fs/binfmt_misc/register ]; then
+    if [ ! -f /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
+      echo "[*] Enabling binfmt for qemu-x86_64..."
+      rc-update add qemu-binfmt default 2>/dev/null || true
+      rc-service qemu-binfmt start 2>/dev/null || {
+        echo '[*] Manual binfmt registration...'
+        echo ':x86_64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00:\xff\xff\xff\xff\xff\xfe\xfe\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff:/usr/bin/qemu-x86_64:OCF' | sudo tee /proc/sys/fs/binfmt_misc/register > /dev/null 2>&1 || true
+      }
+    fi
   fi
 fi
 
