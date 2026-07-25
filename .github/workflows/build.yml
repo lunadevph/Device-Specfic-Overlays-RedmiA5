@@ -32,17 +32,11 @@ jobs:
           echo "SDK_ANDROID_JAR=$(find $ANDROID_HOME/platforms -name android.jar | head -1)" >> $GITHUB_ENV
           echo "$ANDROID_HOME/build-tools/35.0.0" >> $GITHUB_PATH
 
-      - name: Generate build number
+      - name: Generate release tag
         run: |
-          LAST=$(git tag --list 'github-automated-build-*' --sort=version:refname | tail -1 | sed 's/github-automated-build-//')
-          if [ -z "$LAST" ]; then
-            NEXT=1
-          else
-            NEXT=$((10#$LAST + 1))
-          fi
-          BUILD_NUM=$(printf "%010d" $NEXT)
-          echo "BUILD_NUM=$BUILD_NUM" >> $GITHUB_ENV
-          echo "RELEASE_TAG=github-automated-build-$BUILD_NUM" >> $GITHUB_ENV
+          DATE_TAG=$(date +'%m-%d-%y')
+          echo "RELEASE_TAG=github-automated-build-$DATE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_DATE=$(date +'%m/%d/%y')" >> $GITHUB_ENV
 
       - name: Build Overlay-Redmi-A5-Core
         run: |
@@ -75,5 +69,5 @@ jobs:
           gh release create "$RELEASE_TAG" \
             core-build/overlay-serenity.apk \
             systemui-build/overlay-serenity-systemui.apk \
-            --title "Automated Build $BUILD_NUM" \
+            --title "me.phh.treble.overlay.xiaomi.redmia5 + me.phh.treble.overlay.xiaomi.redmia5.systemui — $RELEASE_DATE" \
             --notes "Automated build from commit ${{ github.sha }}"
