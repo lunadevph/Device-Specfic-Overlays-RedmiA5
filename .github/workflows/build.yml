@@ -74,5 +74,5 @@ jobs:
             core-build/overlay-serenity.apk \
             systemui-build/overlay-serenity-systemui.apk \
             out/serenity-overlays.zip \
-            --title "me.phh.treble.overlay.xiaomi.redmia5 + me.phh.treble.overlay.xiaomi.redmia5.systemui — $RELEASE_DATE" \
+            --title "Overlays for Redmi A5/POCO C71 (serenity) — $RELEASE_DATE" \
             --notes "Automated build from commit ${{ github.sha }}"
