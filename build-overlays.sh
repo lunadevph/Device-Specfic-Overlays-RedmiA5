@@ -48,9 +48,17 @@ build_with_apktool() {
   local outapk="$3"
   local pkgname="$4"
 
-  if ! command -v apktool &>/dev/null; then
-    echo "Error: apktool not found. Run setup.sh first." >&2
-    return 1
+  APKTOOL=$(command -v apktool 2>/dev/null || true)
+  if [ -z "$APKTOOL" ]; then
+    ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+    if [ -f "$ANDROID_HOME/apktool" ]; then
+      APKTOOL="$ANDROID_HOME/apktool"
+    elif [ -f "$ANDROID_HOME/apktool.jar" ]; then
+      APKTOOL="java -jar $ANDROID_HOME/apktool.jar"
+    else
+      echo "Error: apktool not found. Run setup.sh first." >&2
+      return 1
+    fi
   fi
 
   local tmpdir="$OUT_DIR/apktool-work/$pkgname"
@@ -77,7 +85,7 @@ versionInfo:
 resourcesAreCompressed: false
 YML
 
-  apktool b "$tmpdir" -o "$outapk"
+  $APKTOOL b "$tmpdir" -o "$outapk"
   rm -rf "$tmpdir"
 }
 

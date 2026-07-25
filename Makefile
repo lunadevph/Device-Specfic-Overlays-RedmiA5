@@ -1,4 +1,7 @@
+ANDROID_HOME ?= $(HOME)/Android/Sdk
 BUILD_NUM ?= 1
+
+export ANDROID_HOME
 
 .PHONY: all setup overlays magisk-module clean
 
