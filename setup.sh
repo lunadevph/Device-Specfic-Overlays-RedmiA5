@@ -61,7 +61,7 @@ case "$DISTRO" in
   debian)   PKG_JAVA="openjdk-17-jdk"     PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
   fedora|rhel) PKG_JAVA="java-17-openjdk" PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
   arch)     PKG_JAVA="jdk17-openjdk"      PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
-  alpine)   PKG_JAVA="openjdk17"          PKG_GLIBC="gcompat"          PKG_OTHER="curl unzip" ;;
+  alpine)   PKG_JAVA="openjdk17"          PKG_GLIBC="gcompat libc6-compat"  PKG_OTHER="curl unzip" ;;
   void)     PKG_JAVA="openjdk17-jdk"      PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
   opensuse) PKG_JAVA="java-17-openjdk"    PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
   *)
@@ -88,6 +88,12 @@ if [ -n "$MISSING" ]; then
 fi
 
 echo "[+] Java: $(java -version 2>&1 | head -1)"
+
+# --- Alpine: ensure glibc linker symlink ---
+if [ "$DISTRO" = "alpine" ] && [ ! -e /lib64/ld-linux-x86-64.so.2 ]; then
+  echo "[*] Creating /lib64/ld-linux-x86-64.so.2 symlink..."
+  sudo ln -sf /lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
+fi
 
 # --- Install Android cmdline-tools ---
 if [ -d "$SDK_DIR/tools" ]; then
