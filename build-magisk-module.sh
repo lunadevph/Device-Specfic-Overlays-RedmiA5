@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT_DIR="$SCRIPT_DIR/out"
-MODULE_DIR="$OUT_DIR/module"
+MODULE_DIR="$OUT_DIR/module-content"
 MODULE_SYSTEM="$MODULE_DIR/system/product/overlay"
 MODULE_NAME="serenity-overlays"
 ZIP_NAME="${MODULE_NAME}.zip"
@@ -22,16 +22,23 @@ cp "$OUT_DIR/overlay-serenity-systemui.apk" "$MODULE_SYSTEM/treble-overlay-xiaom
 
 cat > "$MODULE_DIR/module.prop" << PROP
 id=$MODULE_NAME
-name=Serenity Overlays for Redmi A5
+name=Device Overlays for Redmi A5/POCO C71
 version=$BUILD_NUM
 versionCode=$BUILD_NUM
 author=lunadevph
-description=Device-specific overlays for Redmi A5 (serenity) - Core + SystemUI
+description=Device-specific overlays for Redmi A5/POCO C71 (serenity) - Core + SystemUI
 PROP
 
-cd "$OUT_DIR"
-rm -f "$ZIP_NAME"
-zip -r "$ZIP_NAME" module/ -x ".*" > /dev/null
+# META-INF for Magisk compatibility
+META_DIR="$MODULE_DIR/META-INF/com/google/android"
+mkdir -p "$META_DIR"
+echo '#MAGISK' > "$META_DIR/updater-script"
+# update-binary can be empty for Magisk 20.4+
+: > "$META_DIR/update-binary"
+
+cd "$MODULE_DIR"
+rm -f "$OUT_DIR/$ZIP_NAME"
+zip -r "$OUT_DIR/$ZIP_NAME" . -x ".*" > /dev/null
 cd "$SCRIPT_DIR"
 
 echo "[+] Magisk module created: $OUT_DIR/$ZIP_NAME"
