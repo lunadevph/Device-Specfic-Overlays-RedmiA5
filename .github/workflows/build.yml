@@ -62,6 +62,10 @@ jobs:
             -o systemui-build/overlay-serenity-systemui.apk \
             systemui-build/resources.zip
 
+      - name: Build Magisk module
+        run: |
+          bash build-magisk-module.sh
+
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -69,5 +73,6 @@ jobs:
           gh release create "$RELEASE_TAG" \
             core-build/overlay-serenity.apk \
             systemui-build/overlay-serenity-systemui.apk \
+            out/serenity-overlays.zip \
             --title "me.phh.treble.overlay.xiaomi.redmia5 + me.phh.treble.overlay.xiaomi.redmia5.systemui — $RELEASE_DATE" \
             --notes "Automated build from commit ${{ github.sha }}"
