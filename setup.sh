@@ -4,32 +4,89 @@ set -euo pipefail
 ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 SDK_DIR="$ANDROID_HOME/cmdline-tools"
 
-echo "[*] Checking prerequisites..."
+# --- Distro detection & package install ---
+detect_distro() {
+  if command -v apt &>/dev/null; then echo "debian"
+  elif command -v dnf &>/dev/null; then echo "fedora"
+  elif command -v yum &>/dev/null; then echo "rhel"
+  elif command -v pacman &>/dev/null; then echo "arch"
+  elif command -v apk &>/dev/null; then echo "alpine"
+  elif command -v xbps-install &>/dev/null; then echo "void"
+  elif command -v zypper &>/dev/null; then echo "opensuse"
+  else echo "unknown"
+  fi
+}
 
-if ! command -v java &>/dev/null; then
-  echo "[-] Java not found. Install JDK 17+ first." >&2
-  echo "    Ubuntu/Debian: sudo apt install openjdk-17-jdk" >&2
-  exit 1
-fi
+distro_install() {
+  local d="$1"
+  shift
+  case "$d" in
+    debian)
+      sudo apt update
+      sudo apt install -y "$@"
+      ;;
+    fedora)
+      sudo dnf install -y "$@"
+      ;;
+    rhel)
+      sudo yum install -y "$@"
+      ;;
+    arch)
+      sudo pacman -Sy --noconfirm "$@"
+      ;;
+    alpine)
+      sudo apk add "$@"
+      ;;
+    void)
+      sudo xbps-install -Sy "$@"
+      ;;
+    opensuse)
+      sudo zypper install -y "$@"
+      ;;
+  esac
+}
 
-if ! command -v curl &>/dev/null; then
-  echo "[-] curl not found. Install it first." >&2
-  exit 1
-fi
+DISTRO=$(detect_distro)
+echo "[*] Detected distro: $DISTRO"
 
-if ! command -v unzip &>/dev/null; then
-  echo "[-] unzip not found. Install it first." >&2
-  exit 1
+# --- Map package names per distro ---
+case "$DISTRO" in
+  debian)   PKG_JAVA="openjdk-17-jdk"     PKG_OTHER="curl unzip" ;;
+  fedora|rhel) PKG_JAVA="java-17-openjdk" PKG_OTHER="curl unzip" ;;
+  arch)     PKG_JAVA="jdk17-openjdk"      PKG_OTHER="curl unzip" ;;
+  alpine)   PKG_JAVA="openjdk17"          PKG_OTHER="curl unzip" ;;
+  void)     PKG_JAVA="openjdk17-jdk"      PKG_OTHER="curl unzip" ;;
+  opensuse) PKG_JAVA="java-17-openjdk"    PKG_OTHER="curl unzip" ;;
+  *)
+    echo "[-] Unsupported distro. Install java-17, curl, and unzip manually." >&2
+    exit 1
+    ;;
+esac
+
+# --- Install missing prerequisites ---
+MISSING=""
+command -v java    &>/dev/null || MISSING+=" $PKG_JAVA"
+command -v curl    &>/dev/null || MISSING+=" curl"
+command -v unzip   &>/dev/null || MISSING+=" unzip"
+command -v zip     &>/dev/null || MISSING+=" zip"
+
+if [ -n "$MISSING" ]; then
+  echo "[*] Installing missing packages:$MISSING"
+  # shellcheck disable=SC2086
+  distro_install "$DISTRO" $MISSING
 fi
 
 echo "[+] Java: $(java -version 2>&1 | head -1)"
 
+# --- Install Android cmdline-tools ---
 if [ -d "$SDK_DIR/tools" ]; then
   echo "[*] cmdline-tools already installed at $SDK_DIR/tools"
 else
   echo "[*] Downloading Android SDK command-line tools..."
   mkdir -p "$SDK_DIR"
-  LATEST=$(curl -fsS https://developer.android.com/studio | grep -oP 'commandlinetools-linux-\d+_latest\.zip' | head -1 || echo "commandlinetools-linux-11076708_latest.zip")
+  LATEST=$(curl -fsS https://developer.android.com/studio \
+    | grep -oP 'commandlinetools-linux-\d+_latest\.zip' \
+    | head -1 || echo "commandlinetools-linux-11076708_latest.zip")
   URL="https://dl.google.com/android/repository/$LATEST"
   curl -fSL "$URL" -o /tmp/cmdline-tools.zip
   unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-extracted
