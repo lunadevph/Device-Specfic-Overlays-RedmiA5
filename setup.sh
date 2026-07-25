@@ -46,17 +46,24 @@ distro_install() {
   esac
 }
 
+ARCH=$(uname -m)
 DISTRO=$(detect_distro)
-echo "[*] Detected distro: $DISTRO"
+echo "[*] Detected distro: $DISTRO  |  Arch: $ARCH"
+
+if [ "$ARCH" != "x86_64" ]; then
+  echo "[-] aapt2 (Android build-tools) is only available for x86_64." >&2
+  echo "    Your arch is $ARCH — install aapt2 manually or use an x86_64 machine." >&2
+  exit 1
+fi
 
 # --- Map package names per distro ---
 case "$DISTRO" in
-  debian)   PKG_JAVA="openjdk-17-jdk"     PKG_OTHER="curl unzip" ;;
-  fedora|rhel) PKG_JAVA="java-17-openjdk" PKG_OTHER="curl unzip" ;;
-  arch)     PKG_JAVA="jdk17-openjdk"      PKG_OTHER="curl unzip" ;;
-  alpine)   PKG_JAVA="openjdk17"          PKG_OTHER="curl unzip" ;;
-  void)     PKG_JAVA="openjdk17-jdk"      PKG_OTHER="curl unzip" ;;
-  opensuse) PKG_JAVA="java-17-openjdk"    PKG_OTHER="curl unzip" ;;
+  debian)   PKG_JAVA="openjdk-17-jdk"     PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
+  fedora|rhel) PKG_JAVA="java-17-openjdk" PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
+  arch)     PKG_JAVA="jdk17-openjdk"      PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
+  alpine)   PKG_JAVA="openjdk17"          PKG_GLIBC="gcompat"          PKG_OTHER="curl unzip" ;;
+  void)     PKG_JAVA="openjdk17-jdk"      PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
+  opensuse) PKG_JAVA="java-17-openjdk"    PKG_GLIBC=""                 PKG_OTHER="curl unzip" ;;
   *)
     echo "[-] Unsupported distro. Install java-17, curl, and unzip manually." >&2
     exit 1
@@ -69,6 +76,10 @@ command -v java    &>/dev/null || MISSING+=" $PKG_JAVA"
 command -v curl    &>/dev/null || MISSING+=" curl"
 command -v unzip   &>/dev/null || MISSING+=" unzip"
 command -v zip     &>/dev/null || MISSING+=" zip"
+# On Alpine musl, aapt2 needs glibc compat
+if [ "$DISTRO" = "alpine" ]; then
+  command -v gcompat &>/dev/null || MISSING+=" $PKG_GLIBC"
+fi
 
 if [ -n "$MISSING" ]; then
   echo "[*] Installing missing packages:$MISSING"
