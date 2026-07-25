@@ -4,7 +4,6 @@ set -euo pipefail
 ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 SDK_DIR="$ANDROID_HOME/cmdline-tools"
 
-# --- Distro detection & package install ---
 detect_distro() {
   if command -v apt &>/dev/null; then echo "debian"
   elif command -v dnf &>/dev/null; then echo "fedora"
@@ -36,33 +35,39 @@ DISTRO=$(detect_distro)
 echo "[*] Detected distro: $DISTRO  |  Arch: $ARCH"
 
 if [ "$ARCH" = "x86_64" ]; then
-  USE_AAPT2=1
+  EXTRA=""
 else
-  USE_AAPT2=0
-  echo "[*] aapt2 not available for $ARCH — will use apktool instead"
+  echo "[*] Setting up x86_64 emulation via QEMU for aapt2..."
+  case "$DISTRO" in
+    alpine) EXTRA="qemu-user-static" ;;
+    debian) EXTRA="qemu-user-static" ;;
+    fedora|rhel) EXTRA="qemu-user-static" ;;
+    arch)   EXTRA="qemu-user-static" ;;
+    void)   EXTRA="qemu-user-static" ;;
+    opensuse) EXTRA="qemu-user-static" ;;
+    *)      EXTRA="" ;;
+  esac
 fi
 
-# --- Map package names per distro ---
 case "$DISTRO" in
-  debian)   PKG_JAVA="openjdk-17-jdk"     PKG_GLIBC=""             PKG_OTHER="curl unzip" ;;
-  fedora|rhel) PKG_JAVA="java-17-openjdk" PKG_GLIBC=""             PKG_OTHER="curl unzip" ;;
-  arch)     PKG_JAVA="jdk17-openjdk"      PKG_GLIBC=""             PKG_OTHER="curl unzip" ;;
-  alpine)   PKG_JAVA="openjdk17"          PKG_GLIBC="gcompat libc6-compat" PKG_OTHER="curl unzip" ;;
-  void)     PKG_JAVA="openjdk17-jdk"      PKG_GLIBC=""             PKG_OTHER="curl unzip" ;;
-  opensuse) PKG_JAVA="java-17-openjdk"    PKG_GLIBC=""             PKG_OTHER="curl unzip" ;;
+  debian)   PKG_JAVA="openjdk-17-jdk"     PKG_GLIBC=""             PKG_OTHER="curl unzip $EXTRA" ;;
+  fedora|rhel) PKG_JAVA="java-17-openjdk" PKG_GLIBC=""             PKG_OTHER="curl unzip $EXTRA" ;;
+  arch)     PKG_JAVA="jdk17-openjdk"      PKG_GLIBC=""             PKG_OTHER="curl unzip $EXTRA" ;;
+  alpine)   PKG_JAVA="openjdk17"          PKG_GLIBC="gcompat libc6-compat" PKG_OTHER="curl unzip $EXTRA" ;;
+  void)     PKG_JAVA="openjdk17-jdk"      PKG_GLIBC=""             PKG_OTHER="curl unzip $EXTRA" ;;
+  opensuse) PKG_JAVA="java-17-openjdk"    PKG_GLIBC=""             PKG_OTHER="curl unzip $EXTRA" ;;
   *)
     echo "[-] Unsupported distro. Install java-17, curl, unzip manually." >&2
     exit 1
     ;;
 esac
 
-# --- Install missing prerequisites ---
 MISSING=""
 command -v java  &>/dev/null || MISSING+=" $PKG_JAVA"
 command -v curl  &>/dev/null || MISSING+=" curl"
 command -v unzip &>/dev/null || MISSING+=" unzip"
 command -v zip   &>/dev/null || MISSING+=" zip"
-if [ "$DISTRO" = "alpine" ] && [ "$USE_AAPT2" = 1 ]; then
+if [ "$DISTRO" = "alpine" ]; then
   command -v gcompat &>/dev/null || MISSING+=" $PKG_GLIBC"
 fi
 
@@ -75,43 +80,42 @@ fi
 echo "[+] Java: $(java -version 2>&1 | head -1)"
 
 # --- Alpine: ensure glibc linker symlink ---
-if [ "$DISTRO" = "alpine" ] && [ "$USE_AAPT2" = 1 ] && [ ! -e /lib64/ld-linux-x86-64.so.2 ]; then
+if [ "$DISTRO" = "alpine" ] && [ ! -e /lib64/ld-linux-x86-64.so.2 ]; then
   echo "[*] Creating /lib64/ld-linux-x86-64.so.2 symlink..."
   sudo ln -sf /lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 fi
 
-# --- Install Android SDK (only needed for aapt2) ---
-if [ "$USE_AAPT2" = 1 ]; then
-  if [ -d "$SDK_DIR/tools" ]; then
-    echo "[*] cmdline-tools already installed at $SDK_DIR/tools"
-  else
-    echo "[*] Downloading Android SDK command-line tools..."
-    mkdir -p "$SDK_DIR"
-    LATEST=$(curl -fsS https://developer.android.com/studio \
-      | grep -oE 'commandlinetools-linux-[0-9]+_latest\.zip' \
-      | head -1 || echo "commandlinetools-linux-11076708_latest.zip")
-    URL="https://dl.google.com/android/repository/$LATEST"
-    curl -fSL "$URL" -o /tmp/cmdline-tools.zip
-    unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-extracted
-    mkdir -p "$SDK_DIR/tools"
-    mv /tmp/cmdline-tools-extracted/cmdline-tools/* "$SDK_DIR/tools/"
-    rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-tools-extracted
-    echo "[+] cmdline-tools installed"
-  fi
-
-  export PATH="$SDK_DIR/tools/bin:$PATH"
-  echo "[*] Accepting licenses..."
-  yes | sdkmanager --licenses > /dev/null 2>&1 || true
-  echo "[*] Installing platform android-35 and build-tools..."
-  sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+# --- Install Android SDK ---
+if [ -d "$SDK_DIR/tools" ]; then
+  echo "[*] cmdline-tools already installed at $SDK_DIR/tools"
+else
+  echo "[*] Downloading Android SDK command-line tools..."
+  mkdir -p "$SDK_DIR"
+  LATEST=$(curl -fsS https://developer.android.com/studio \
+    | grep -oE 'commandlinetools-linux-[0-9]+_latest\.zip' \
+    | head -1 || echo "commandlinetools-linux-11076708_latest.zip")
+  URL="https://dl.google.com/android/repository/$LATEST"
+  curl -fSL "$URL" -o /tmp/cmdline-tools.zip
+  unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-extracted
+  mkdir -p "$SDK_DIR/tools"
+  mv /tmp/cmdline-tools-extracted/cmdline-tools/* "$SDK_DIR/tools/"
+  rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-tools-extracted
+  echo "[+] cmdline-tools installed"
 fi
 
-# --- Install apktool.jar (for non-x86_64 or as fallback) ---
+export PATH="$SDK_DIR/tools/bin:$PATH"
+
+echo "[*] Accepting licenses..."
+yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+echo "[*] Installing platform android-35 and build-tools..."
+sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+# --- Also download apktool.jar as fallback ---
 APKTOOL_JAR="$ANDROID_HOME/apktool.jar"
 APKTOOL_WRAPPER="$ANDROID_HOME/apktool"
 if [ ! -f "$APKTOOL_JAR" ]; then
-  echo "[*] Downloading apktool.jar..."
-  mkdir -p "$ANDROID_HOME"
+  echo "[*] Downloading apktool.jar (fallback)..."
   curl -fSL "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar" -o "$APKTOOL_JAR"
 fi
 if [ ! -f "$APKTOOL_WRAPPER" ]; then
@@ -125,4 +129,5 @@ export PATH="$ANDROID_HOME:$PATH"
 
 echo "[+] Setup complete."
 echo "    ANDROID_HOME=$ANDROID_HOME"
-echo "    Run: export ANDROID_HOME=\"$ANDROID_HOME\" && export PATH=\"\$ANDROID_HOME:\$PATH\""
+echo "    export ANDROID_HOME=\"$ANDROID_HOME\""
+echo "    export PATH=\"\$ANDROID_HOME:\$PATH\""
