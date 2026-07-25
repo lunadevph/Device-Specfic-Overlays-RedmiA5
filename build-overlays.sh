@@ -7,6 +7,17 @@ ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 AAPT2="${AAPT2:-$ANDROID_HOME/build-tools/35.0.0/aapt2}"
 SDK_JAR="${SDK_JAR:-$ANDROID_HOME/platforms/android-35/android.jar}"
 
+ARCH=$(uname -m)
+
+# --- On aarch64, wrap with box64 if available ---
+if [ "$ARCH" != "x86_64" ] && command -v box64 &>/dev/null; then
+  RUN_AAPT2="box64 $AAPT2"
+  RUN_JAVA="box64 java"
+else
+  RUN_AAPT2="$AAPT2"
+  RUN_JAVA="java"
+fi
+
 # --- Try to find android.jar ---
 if [ ! -f "$SDK_JAR" ]; then
   SDK_JAR=$(find "$ANDROID_HOME/platforms" -name android.jar 2>/dev/null | head -1 || true)
@@ -25,8 +36,8 @@ find_apktool() {
 build_with_aapt2() {
   local manifest="$1" resdir="$2" outapk="$3" tmpdir="$4"
   mkdir -p "$tmpdir" "$(dirname "$outapk")"
-  "$AAPT2" compile --dir "$resdir" -o "$tmpdir/resources.zip"
-  "$AAPT2" link --manifest "$manifest" -I "$SDK_JAR" -o "$outapk" "$tmpdir/resources.zip"
+  $RUN_AAPT2 compile --dir "$resdir" -o "$tmpdir/resources.zip"
+  $RUN_AAPT2 link --manifest "$manifest" -I "$SDK_JAR" -o "$outapk" "$tmpdir/resources.zip"
 }
 
 build_with_apktool() {

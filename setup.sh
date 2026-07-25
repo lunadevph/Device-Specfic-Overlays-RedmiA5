@@ -37,13 +37,13 @@ echo "[*] Detected distro: $DISTRO  |  Arch: $ARCH"
 if [ "$ARCH" = "x86_64" ]; then
   EXTRA=""
 else
-  echo "[*] Setting up x86_64 emulation via QEMU for aapt2..."
+  echo "[*] Setting up x86_64 emulation for aapt2..."
   case "$DISTRO" in
-    alpine) EXTRA="qemu-user-static" ;;
+    alpine) EXTRA="box64" ;;
     debian) EXTRA="qemu-user-static" ;;
     fedora|rhel) EXTRA="qemu-user-static" ;;
     arch)   EXTRA="qemu-user-static" ;;
-    void)   EXTRA="qemu-user-static" ;;
+    void)   EXTRA="box64" ;;
     opensuse) EXTRA="qemu-user-static" ;;
     *)      EXTRA="" ;;
   esac
@@ -83,6 +83,16 @@ echo "[+] Java: $(java -version 2>&1 | head -1)"
 if [ "$DISTRO" = "alpine" ] && [ ! -e /lib64/ld-linux-x86-64.so.2 ]; then
   echo "[*] Creating /lib64/ld-linux-x86-64.so.2 symlink..."
   sudo ln -sf /lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
+fi
+
+# --- On non-x86_64: register binfmt for box64 so x86_64 binaries run transparently ---
+if [ "$ARCH" != "x86_64" ] && command -v box64 &>/dev/null; then
+  if [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
+    echo "[*] binfmt_misc not available — box64 will be used explicitly"
+  elif [ ! -f /proc/sys/fs/binfmt_misc/box64 ] && [ ! -f /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
+    echo "[*] Registering box64 binfmt handler..."
+    echo ':x86_64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00:\xff\xff\xff\xff\xff\xfe\xfe\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff:/usr/bin/box64:OC' | sudo tee /proc/sys/fs/binfmt_misc/register > /dev/null 2>&1 || true
+  fi
 fi
 
 # --- Install Android SDK ---
