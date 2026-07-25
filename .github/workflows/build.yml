@@ -64,6 +64,9 @@ jobs:
 
       - name: Build Magisk module
         run: |
+          mkdir -p out
+          cp core-build/overlay-serenity.apk out/
+          cp systemui-build/overlay-serenity-systemui.apk out/
           bash build-magisk-module.sh
 
       - name: Create Release
